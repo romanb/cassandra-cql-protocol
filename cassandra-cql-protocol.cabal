@@ -1,0 +1,61 @@
+name:                cassandra-cql-protocol
+synopsis:            Implementation of the Cassandra CQL binary protocol.
+version:             0.1.0.0
+stability:           experimental
+license:             BSD3
+license-file:        LICENSE
+author:              Roman S. Borschel, Stephen Blackheath
+maintainer:          Roman S. Borschel <roman.borschel@googlemail.com>
+copyright:           Copyright (c) 2013 Roman S. Borschel, (c) Stephen Blackheath 2013
+category:            Database
+build-type:          Simple
+cabal-version:       >=1.8
+
+library
+    hs-source-dirs:  src
+    ghc-options:     -Wall -fwarn-tabs
+
+    exposed-modules:
+        Database.Cassandra.CQL.Protocol
+        Database.Cassandra.CQL.Protocol.Types
+
+    build-depends:
+        base == 4.6.*
+      , cereal == 0.3.*
+      , text == 0.11.*
+      , uuid == 1.2.*
+      , bytestring == 0.10.*
+      , network == 2.4.*
+      , containers == 0.5.*
+      , Decimal == 0.3.*
+
+test-suite cassandra-cql-protocol-tests
+    type:            exitcode-stdio-1.0
+    hs-source-dirs:  test
+    main-is:         TestSuite.hs
+    ghc-options:     -Wall -fwarn-tabs
+
+    other-modules:
+        Tests.Database.Cassandra.CQL.Protocol
+        Tests.Database.Cassandra.CQL.Protocol.Properties
+
+    build-depends:
+        base == 4.6.*
+      , cassandra-cql-protocol
+
+      , lifted-base == 0.2.*
+      , transformers == 0.3.*
+      , text == 0.11.*
+      , uuid == 1.2.*
+      , bytestring == 0.10.*
+      , network == 2.4.*
+      , containers == 0.5.*
+      , Decimal == 0.3.*
+      , snappy == 0.2.*
+      , lz4 == 0.2.*
+
+      , HUnit >= 1.2
+      , QuickCheck >= 2.5
+      , test-framework >= 0.8
+      , test-framework-hunit >= 0.2
+      , test-framework-quickcheck2 >= 0.2
