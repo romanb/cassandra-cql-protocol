@@ -3,7 +3,7 @@ module Tests.Database.Cassandra.CQL.Protocol (tests) where
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Exception.Lifted (finally)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
@@ -48,14 +48,14 @@ testStartup = testCase "Startup -> Ready" $ withConnection $ sendRequest req >>=
   where
     req = startupRequest
     check (Response Ready 0 Nothing) = return ()
-    check r = liftIO $ assertFailure $ "Unexpected response to 'Startup': " ++ show r
+    check r = failure r
 
 testOptions :: Test
 testOptions = testCase "Options -> Supported" $ withConnection $ sendRequest req >>= check
   where
     req = Request Options 0 False
     check (Response (Supported _ _) 0 Nothing) = return ()
-    check r = liftIO $ assertFailure $ "Unexpected response to 'Options': " ++ show r
+    check r = failure r
 
 testRowsQuery :: Test
 testRowsQuery = testCase "Query -> Result (Rows)" $ withConnection $ withTestSchema $ do
@@ -72,7 +72,7 @@ testRowsQuery = testCase "Query -> Result (Rows)" $ withConnection $ withTestSch
             actualRows = decodeRows rows
         assertEqual "rows.meta" expectedMeta meta
         assertEqual "rows" expectedRows actualRows
-    check x = assertFailure $ "Expected rows result, got " ++ show x
+    check x = failure x
 
 testQueryWithTracing :: Test
 testQueryWithTracing = testCase "Query with tracing" $ withConnection $ withTestSchema $ do
@@ -92,19 +92,17 @@ testPrepareExecute = testCase "Prepare -> Execute -> Result (Rows)" $ withConnec
   where
     prepReq = simpleRequest $ Prepare testRecordInsertCQL
     checkPrep (Response (Result (Prepared qid)) 0 Nothing) = return qid
-    checkPrep r = lift $ MaybeT $ do
-        assertFailure $ "Expected: Result (Prepared id), got: " ++ show r
-        return Nothing
+    checkPrep r = lift $ MaybeT $ failure r >> return Nothing
 
     execReq qid r = simpleRequest $ Execute qid (encodeValues r) QUORUM
     checkExec (Response (Result Void) 0 Nothing) = return ()
-    checkExec r = liftIO $ assertFailure $ "Expected void result, got " ++ show r
+    checkExec r = failure r
 
     checkQry r = liftIO $ case (rspMessage r) of
         Result (Rows _ rows) -> assertEqual "prepare.execute.rows"
                                     (Right [testRecord1, testRecord2])
                                     (decodeRows rows)
-        x -> assertFailure $ "Expected rows result, got " ++ show x
+        x -> failure x
 
 testRegisterEvent :: Test
 testRegisterEvent = testCase "Register -> Event" $ withConnection $ withTestSchema $ do
@@ -117,7 +115,7 @@ testRegisterEvent = testCase "Register -> Event" $ withConnection $ withTestSche
         Right (Response msg _ _) -> check msg
   where
     check (Result (SchemaChange CREATED "prototest" "test2")) = return ()
-    check r = assertFailure $ "Expected SchemaChange event, got: " ++ show r
+    check r = failure r
 
 testSnappyCompression :: Test
 testSnappyCompression = testCase "Snappy Compression" $ withConnection $ do
@@ -131,10 +129,10 @@ testSnappyCompression = testCase "Snappy Compression" $ withConnection $ do
                 rsp <- decodeResponse (hGet h) (Just $ Just . Snappy.decompress)
                 check rsp
         Supported _ _ -> liftIO $ putStrLn $ "Snappy not supported, ignoring test."
-        _ -> liftIO $ assertFailure $ "Unexpected response: " ++ show r1
+        _ -> failure r1
   where
     check (Right (Response Ready 0 Nothing)) = return ()
-    check r = assertFailure $ "Unexpected response: " ++ show r
+    check r = failure r
 
 -- HELPERS
 -------------------------------------------------------------------------------
@@ -173,6 +171,9 @@ query_ q = sendRequest_ $ simpleRequest $ Query q QUORUM
 
 startup_ :: ProtoAction ()
 startup_ = sendRequest_ startupRequest
+
+failure :: (Show a, MonadIO m) => a -> m ()
+failure a = liftIO $ assertFailure $ "Unexpected result: " ++ show a
 
 -- TODO: Randomize keyspace name to avoid accidental collisions
 withTestSchema :: ProtoAction a -> ProtoAction a
