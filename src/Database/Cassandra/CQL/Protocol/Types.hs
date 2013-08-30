@@ -17,12 +17,23 @@ data Compression
     | Zlib   -- ^ Cassandra 2.0+
     deriving (Eq, Show)
 
+-- | The ID of a 'Prepare'd query.
 newtype PreparedQueryId = PreparedQueryId ByteString deriving (Eq, Show)
 
 data Request = Request
     { reqMessage :: !RequestMessage
-    , reqStreamId :: !Int8 -- ^ For correlating async. responses to requests.
-    , reqTracing :: !Bool -- ^ Whether to trace the request. The response will contain a 'rspTraceId'.
+        -- ^ The actual message of the request which determines the possible
+        -- responses.
+    , reqStreamId :: !Int8
+        -- ^ The stream IDs is used to correlate async. responses to requests.
+        -- Negative IDs are reserved for the server (e.g. all 'Event' responses
+        -- have a stream ID of -1). Thus there are 127 stream IDs available for
+        -- clients to manage async. requests per connection.
+    , reqTracing :: !Bool
+        -- ^ Whether to trace the request. If so, the response will contain a
+        -- 'rspTraceId'. Note that not all requests support tracing.
+        -- Currently, only 'Query', 'Prepare' and 'Execute' queries support tracing.
+        -- Other requests will simply ignore this setting.
     } deriving (Eq, Show)
 
 data RequestMessage
@@ -62,8 +73,8 @@ data RequestMessage
 
 data Response = Response
     { rspMessage :: !ResponseMessage
-    , rspStreamId :: !Int8 -- ^ response stream ID to correlate it to the right request
-    , rspTraceId :: !(Maybe UUID) -- ^ response trace ID if tracing was requested
+    , rspStreamId :: !Int8
+    , rspTraceId :: !(Maybe UUID)
     } deriving (Eq, Show)
 
 data ResponseMessage
@@ -78,8 +89,7 @@ data ResponseMessage
         -- ^ Successful response to a 'Query', 'Prepare' or 'Execute' message.
     | Event !Event
         -- ^ A push notification from the server, if the client previously
-        -- 'Register'ed to any 'EventType's. Every 'Response' with an 'Event'
-        -- message has a 'rspStreamId' of -1.
+        -- 'Register'ed to any 'EventType's.
     | Error !Text !ErrorDetail
         -- ^ Any request can result in an 'Error' response from the server.
     deriving (Eq, Show)
@@ -113,7 +123,6 @@ data ErrorDetail
         , unavailNumRequired :: !Int32
         , unavailNumAlive :: !Int32
         }
-        -- ^ Not enough nodes for desired consistency (alive < required)
     | Overloaded
     | IsBootstrapping
     | TruncateError
@@ -178,22 +187,25 @@ data ColumnType
     | CSet !ColumnType
     deriving (Eq, Show)
 
-data SchemaChangeType
-    = CREATED
-    | UPDATED
-    | DROPPED
+-- | Event types that clients can 'Register' to.
+data EventType
+    = TOPOLOGY_CHANGE
+    | STATUS_CHANGE
+    | SCHEMA_CHANGE
     deriving (Eq, Show)
 
 -- | Events that clients can be notified of.
 data Event
     = TopologyChanged !TopologyChangeType !SockAddr
         -- ^ A node was added or removed from the topology.
+        -- To receive this event, 'Register' for 'TOPOLOGY_CHANGE'.
     | StatusChanged !StatusChangeType !SockAddr
         -- ^ The availability status of a node changed.
+        -- To receive this event, 'Register' for 'STATUS_CHANGE'.
     | SchemaChanged SchemaChangeType !Text !Text
-        -- ^ A schema change was made. Affected keyspace and table are given as
-        -- 2nd and 3rd arguments respectively. If only a keyspace was affected,
-        -- the table name will be empty.
+        -- ^ A schema change was made, mentioning the affected keyspace and table.
+        -- If only a keyspace was affected, the table name will be empty.
+        -- To receive this event, 'Register' for 'SCHEMA_CHANGE'.
     deriving (Eq, Show)
 
 data TopologyChangeType
@@ -206,9 +218,8 @@ data StatusChangeType
     | DOWN
     deriving (Eq, Show)
 
--- | Event types that clients can 'Register' to.
-data EventType
-    = TOPOLOGY_CHANGE
-    | STATUS_CHANGE
-    | SCHEMA_CHANGE
+data SchemaChangeType
+    = CREATED
+    | UPDATED
+    | DROPPED
     deriving (Eq, Show)
