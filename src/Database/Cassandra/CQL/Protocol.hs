@@ -145,11 +145,6 @@ putLongStr t = do
     putInt $ T.length t
     putByteString $ E.encodeUtf8 t
 
---putStrList :: [Text] -> Put
---putStrList l = do
---    putShortLen l
---    mapM_ putStr l
-
 getStrList :: Get [Text]
 getStrList = do
     n <- getShort
@@ -177,25 +172,10 @@ putShortBytes bs = do
 getShortBytes :: Get ByteString
 getShortBytes = getShort >>= getByteString . fromIntegral
 
---putOption :: Word16 -> ByteString -> Put
---putOption k v = do
---    putShort k
---    putByteString v
-
---putOptionList :: [(Word16, ByteString)] -> Put
---putOptionList l = do
---    putShortLen l
---    mapM_ (uncurry putOption) l
-
 putStrMap :: [(Text, Text)] -> Put
 putStrMap m = do
     putShort $ length m
     forM_ m $ \(k, v) -> putStr k >> putStr v
-
---putStrMultiMap :: [(Text, [Text])] -> Put
---putStrMultiMap m = do
---    putShort $ length m
---    forM_ m $ \(k, v) -> putStr k >> putStrList v
 
 getStrMultiMap :: Get [(Text, [Text])]
 getStrMultiMap = do
