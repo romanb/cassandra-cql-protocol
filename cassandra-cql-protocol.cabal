@@ -29,6 +29,10 @@ library
       , containers == 0.5.*
       , Decimal == 0.3.*
 
+source-repository head
+    type:            git
+    location:        git@github.com:romanb/cassandra-cql-protocol.git
+
 test-suite cassandra-cql-protocol-tests
     type:            exitcode-stdio-1.0
     hs-source-dirs:  test

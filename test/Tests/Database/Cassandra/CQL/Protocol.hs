@@ -23,7 +23,8 @@ import Test.Framework
 import Test.Framework.Providers.HUnit
 import Test.HUnit hiding (Test)
 
--- import qualified Codec.Compression.LZ4 as LZ4 -- TODO: Test?
+-- TODO: Test zlib compression, requires at least Cassandra 2.0.0-beta2
+-- import qualified Codec.Compression.LZ4 as LZ4
 import qualified Codec.Compression.Snappy as Snappy
 import qualified Data.ByteString.Char8 as C
 import qualified Data.Map as Map
@@ -32,7 +33,7 @@ import qualified Data.UUID as UUID
 
 import Data.Bits (shiftL)
 
--- TODO: Share connection between some tests (compression is per connection)?
+-- TODO: Share connection between (some) tests (compression is per connection)?
 tests :: [Test]
 tests = [ testStartup
         , testOptions

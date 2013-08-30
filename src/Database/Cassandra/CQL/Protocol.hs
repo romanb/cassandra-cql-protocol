@@ -33,14 +33,15 @@ module Database.Cassandra.CQL.Protocol
     , Decompress
 
       -- * Encoding & Decoding Values
+      -- $values
+    , encodeValue
+    , decodeValue
+    , decodeRows
     , FromCasValue(..)
     , ToCasValue(..)
     , FromCasValues(..)
     , ToCasValues(..)
     , Param(..)
-    , encodeValue
-    , decodeValue
-    , decodeRows
 
       -- * Request Construction
     , simpleRequest
@@ -322,9 +323,8 @@ getBool = (/=0) <$> getWord8
 getRows :: Get Result
 getRows = do
     flags        <- getInt
-    let gobalTbl  = flags .&. 0x0001 == 0x0001
     colCount     <- fromIntegral <$> getInt
-    globalTable  <- if gobalTbl
+    globalTable  <- if flags .&. 0x0001 == 0x0001
                         then Just <$> tableSpec
                         else return Nothing
     cols         <- replicateM colCount (getColInfo globalTable)
@@ -374,8 +374,8 @@ getEvent = getStr >>= (\s ->
 putEventType :: EventType -> Put
 putEventType et = case et of
     TOPOLOGY_CHANGE -> putStr "TOPOLOGY_CHANGE"
-    STATUS_CHANGE -> putStr "STATUS_CHANGE"
-    SCHEMA_CHANGE -> putStr "SCHEMA_CHANGE"
+    STATUS_CHANGE   -> putStr "STATUS_CHANGE"
+    SCHEMA_CHANGE   -> putStr "SCHEMA_CHANGE"
 
 -- SockAddr representation as in 'Event' responses.
 -- Note that this is different from the SockAddr representation
@@ -470,6 +470,7 @@ data DecodeFailure
     = DecodeHeaderFailure String
     | DecompressionFailure
     | DecodeBodyFailure String
+    deriving (Eq)
 
 instance Show DecodeFailure where
     show (DecodeHeaderFailure msg) = "Failed to decode frame header: " ++ msg
@@ -505,7 +506,7 @@ decodeResponse recv compr = do
 -- the server for its supported compression algorithms by sending an 'Options'
 -- message before the 'Startup', which will return the 'Supported' options.
 --
--- Example using the /snappy/ module:
+-- Example for decompression using the /snappy/ module:
 --
 -- @
 --     import qualified Codec.Compression.Snappy as Snappy
@@ -513,7 +514,7 @@ decodeResponse recv compr = do
 --     decodeResponse (hGet h) (Just $ Just . Snappy.decompress)
 -- @
 --
--- Example using the /lz4/ module:
+-- Example for decompression using the /lz4/ module:
 --
 -- @
 --     import qualified Codec.Compression.LZ4 as LZ4
@@ -533,6 +534,36 @@ type Decompress = ByteString -> Maybe ByteString
 
 -- Encoding & Decoding of Values (parameters and result rows)
 -------------------------------------------------------------------------------
+
+-- $values
+-- The primary functions for encoding request parameters (for 'Execute') and
+-- decoding result rows (from 'Rows') are 'encodeValue', 'decodeValue',
+-- 'encodeValues', 'decodeValues' and 'decodeRows'. The first two are used
+-- for types that represent single values, that is, values that are represented
+-- as a single Cassandra value in the binary protocol. The plural variants are
+-- used for types that are represented as lists of values, e.g. tuples or records
+-- for result rows. Finally, 'decodeRows' is a convenience to decode a complete
+-- result set, e.g. into tuples or records.
+--
+-- You will typically not need to implement new instances for 'FromCasValue'
+-- and 'ToCasValue' besides deriving them for your own newtypes as the set of
+-- available base types is defined by the protocol.
+--
+-- You will want to implement instances of 'ToCasValues' and 'FromCasValues'
+-- for record types that you wish to encode as query parameters and decode
+-- from query results, respectively. In simple cases this can just look
+-- as follows:
+--
+-- @
+--     data User = User { usrId :: Int32, usrName :: Text }
+--
+--     instance ToCasValues User where
+--         encodeValues u = [encodeValue (usrId r), encodeValue (usrName u)]
+--
+--     instance FromCasValues User where
+--         decodeValues (id:name:_) = User <$> decodeValue id <*> decodeValue name
+--         decodeValues _ = Left "Not enough values to decode User."
+-- @
 
 newtype Blob = Blob ByteString deriving (Eq, Ord, Show, ToCasValue, FromCasValue)
 newtype Counter = Counter Int64 deriving (Eq, Ord, Show, Read, ToCasValue, FromCasValue)
@@ -743,7 +774,7 @@ instance ToCasValue SockAddr where
 class ToCasValues a where
     encodeValues :: a -> [Maybe ByteString]
 
--- | Class of types that can be parsed from a list of a Cassandra values
+-- | Class of types that can be parsed from a list of Cassandra values
 -- (e.g. a query result row as returned by the 'Rows' result).
 class FromCasValues a where
     decodeValues :: [Maybe ByteString] -> Either String a

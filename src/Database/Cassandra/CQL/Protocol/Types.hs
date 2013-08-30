@@ -12,12 +12,16 @@ import Network.Socket (SockAddr)
 -- implementation, so that the APIs are a bit more future-proof.
 data CQLVersion = CQLv3 deriving (Eq, Show)
 
+-- | The possibly supported compression algorithms. Which algorithms are
+-- available depends on the Cassandra server version and configuration.
+-- An 'Options' request message can be used to get a list of the supported
+-- algorithms at runtime.
 data Compression
     = Snappy
     | Zlib   -- ^ Cassandra 2.0+
     deriving (Eq, Show)
 
--- | The ID of a 'Prepare'd query.
+-- | The ID of a 'Prepare'd query used in each subsequent 'Execute' message.
 newtype PreparedQueryId = PreparedQueryId ByteString deriving (Eq, Show)
 
 data Request = Request
@@ -58,15 +62,9 @@ data RequestMessage
         -- A successful response contains a 'Result' message with 'Rows'.
     | Prepare !Text
         -- ^ Prepare a CQL query for execution.
-    | Execute
-        { execPrepId :: !PreparedQueryId
-            -- ^ The ID from the previously 'Prepared' query response.
-        , execValues :: ![Maybe ByteString]
-            -- ^ The values for the previously bound parameters (placeholders).
-        , execConsistency :: !Consistency
-            -- ^ The desired consistency guarantees of the query result.
-        }
-        -- ^ Execute a previously prepared CQL query.
+    | Execute !PreparedQueryId ![Maybe ByteString] !Consistency
+        -- ^ Execute a prepared query with the given values for the previously
+        -- bound placeholders and the desired consistency.
     | Register ![EventType]
         -- ^ Register for one or more 'Event's.
     deriving (Eq, Show)
