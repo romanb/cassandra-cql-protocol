@@ -303,7 +303,7 @@ getError = do
         0x2200 -> return Invalid
         0x2300 -> return ConfigError
         0x2400 -> AlreadyExists <$> getStr <*> getStr
-        0x2500 -> Unprepared <$> getShortBytes
+        0x2500 -> Unprepared <$> PreparedQueryId <$> getShortBytes
         _      -> fail $ "Unrecognized error code: 0x" ++ (showHex code "")
 
 getWriteType :: Get WriteType

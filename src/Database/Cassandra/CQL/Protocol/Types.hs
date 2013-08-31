@@ -24,6 +24,9 @@ data Compression
 -- | The ID of a 'Prepare'd query used in each subsequent 'Execute' message.
 newtype PreparedQueryId = PreparedQueryId ByteString deriving (Eq, Show)
 
+type Keyspace = Text
+type Table = Text
+
 data Request = Request
     { reqMessage :: !RequestMessage
         -- ^ The actual message of the request which determines the possible
@@ -67,6 +70,7 @@ data RequestMessage
         -- bound placeholders and the desired consistency.
     | Register ![EventType]
         -- ^ Register for one or more 'Event's.
+        -- A successful response contains a 'Ready' message.
     deriving (Eq, Show)
 
 data Response = Response
@@ -80,7 +84,7 @@ data ResponseMessage
         -- ^ Authentication challenge from the server, indicating the full class
         -- name of the IAuthenticator in use.
     | Ready
-        -- ^ Successful response to a 'Startup' message.
+        -- ^ Successful response to a 'Startup' or 'Register' message.
     | Supported ![CQLVersion] ![Compression]
         -- ^ Successful response to an 'Options' message.
     | Result !Result
@@ -98,7 +102,7 @@ data Result
     | Rows !Metadata ![[Maybe ByteString]]
     | SetKeyspace !Text
     | Prepared !PreparedQueryId
-    | SchemaChange !SchemaChangeType !Text !Text
+    | SchemaChange !SchemaChangeType !Keyspace !Table
     deriving (Eq, Show)
 
 data Consistency
@@ -114,34 +118,67 @@ data Consistency
 
 data ErrorDetail
     = ServerError
+        -- ^ Server error: something unexpected happened. This indicates a
+        -- server-side bug.
     | ProtocolError
+        -- ^ Protocol error: some client message triggered a protocol
+        -- violation (for instance a 'Query' message is sent before a 'Startup'
+        -- message has been sent).
     | BadCredentials
     | Unavailable
         { unavailConsistency :: !Consistency
+            -- ^ The consistency level of the query having triggered
+            -- the error.
         , unavailNumRequired :: !Int32
+            -- ^ The number of nodes that are required to be alive to
+            -- respect the desired consistency level of the query.
         , unavailNumAlive :: !Int32
+            -- ^ The actual number of nodes that were known to be alive when
+            -- the request was processed (alive < required).
         }
     | Overloaded
     | IsBootstrapping
     | TruncateError
     | WriteTimeout
         { wTimeoutConsistency :: !Consistency
+            -- ^ The consistency level of the query having triggered the error.
         , wTimeoutNumAck :: !Int32
+            -- ^ The number of nodes having acknowledged the write request.
         , wTimeoutNumRequired :: !Int32
+            -- ^ The number of nodes that were required to acknowledge the
+            -- write request in order for it to be successful.
         , wTimeoutWriteType :: !WriteType
         }
     | ReadTimeout
         { rTimeoutConsistency :: !Consistency
+            -- ^ The consistency level of the query having triggered the error.
         , rTimeoutNumAck :: !Int32
+            -- ^ The number of nodes having answered the read request.
         , rTimeoutNumRequired :: !Int32
+            -- ^ The number of nodes that were required to answer the read request
+            -- in order for it to be successful.
         , rTimeoutDataPresent :: !Bool
+            -- ^ Whether the actual data was amongst the received responses.
+            -- During reads, Cassandra doesn't request data from every replica
+            -- to minimize internal network traffic. Instead, some replica are
+            -- only asked for a checksum of the data. A read timeout may occur
+            -- even if enough replica have responded to fulfill the consistency
+            -- level if only checksum responses have been received. This flag
+            -- allows to detect that case.
         }
     | SyntaxError
+        -- ^ A submitted query has a syntax error.
     | Unauthorized
     | Invalid
+        -- ^ A submitted query is syntactically correct but invalid due to
+        -- other reasons.
     | ConfigError
-    | AlreadyExists !Text !Text
-    | Unprepared !ByteString
+        -- ^ A submitted query is invalid because of some configuration issue.
+    | AlreadyExists !Keyspace !Table
+        -- ^ A query attempted to create a keyspace and/or table that already
+        -- exists.
+    | Unprepared !PreparedQueryId
+        -- ^ A prepared statement ID is not known to the host being queried.
     deriving (Eq, Show)
 
 data WriteType
