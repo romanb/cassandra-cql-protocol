@@ -62,12 +62,14 @@ data RequestMessage
         -- A successful response contains a 'Supported' message.
     | Query !Text !Consistency
         -- ^ Directly execute a CQL query with the desired consistency.
-        -- A successful response contains a 'Result' message with 'Rows'.
+        -- A successful response contains a 'Result' message.
     | Prepare !Text
-        -- ^ Prepare a CQL query for execution.
+        -- ^ Prepare a CQL query for execution. A successful response contains
+        -- a 'Result' message ('Prepared') containing the 'PreparedQueryId'.
     | Execute !PreparedQueryId ![Maybe ByteString] !Consistency
         -- ^ Execute a prepared query with the given values for the previously
-        -- bound placeholders and the desired consistency.
+        -- bound placeholders and the desired consistency. A successful response
+        -- contains a 'Result' message.
     | Register ![EventType]
         -- ^ Register for one or more 'Event's.
         -- A successful response contains a 'Ready' message.
@@ -100,7 +102,7 @@ data ResponseMessage
 data Result
     = Void
     | Rows !Metadata ![[Maybe ByteString]]
-    | SetKeyspace !Text
+    | SetKeyspace !Keyspace
     | Prepared !PreparedQueryId
     | SchemaChange !SchemaChangeType !Keyspace !Table
     deriving (Eq, Show)
@@ -121,9 +123,8 @@ data ErrorDetail
         -- ^ Server error: something unexpected happened. This indicates a
         -- server-side bug.
     | ProtocolError
-        -- ^ Protocol error: some client message triggered a protocol
-        -- violation (for instance a 'Query' message is sent before a 'Startup'
-        -- message has been sent).
+        -- ^ Some client message triggered a protocol violation (for instance
+        -- a 'Query' message is sent before a 'Startup' message).
     | BadCredentials
     | Unavailable
         { unavailConsistency :: !Consistency
@@ -237,7 +238,7 @@ data Event
     | StatusChanged !StatusChangeType !SockAddr
         -- ^ The availability status of a node changed.
         -- To receive this event, 'Register' for 'STATUS_CHANGE'.
-    | SchemaChanged SchemaChangeType !Text !Text
+    | SchemaChanged !SchemaChangeType !Text !Text
         -- ^ A schema change was made, mentioning the affected keyspace and table.
         -- If only a keyspace was affected, the table name will be empty.
         -- To receive this event, 'Register' for 'SCHEMA_CHANGE'.

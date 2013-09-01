@@ -10,7 +10,7 @@ of an existing implementation of the protocol that is built into the 'cassandra-
 package, which provides an all-in-one Cassandra CQL client.
 In contrast, the purpose of this library is to have a reusable, standalone and
 complete implementation of the protocol that leaves any other concerns, like the
-actual I/O, connection management/pooling, sync vs async queries or convenient,
+actual I\/O, connection management\/pooling, sync vs async queries or convenient,
 high-level ways of defining and constructing the actual CQL queries, to user code
 and/or other client libraries that are built on top of this protocol implementation.
 
@@ -24,7 +24,7 @@ module Database.Cassandra.CQL.Protocol
     , Timestamp(..)
     , TimeUUID(..)
 
-      -- * Request & Response Encoding and Decoding
+      -- * Encoding Requests & Decoding Responses
     , encodeRequest
     , decodeResponse
       -- ** Compression
@@ -568,6 +568,7 @@ type Decompress = ByteString -> Maybe ByteString
 
 newtype Blob = Blob ByteString deriving (Eq, Ord, Show, ToCasValue, FromCasValue)
 newtype Counter = Counter Int64 deriving (Eq, Ord, Show, Read, ToCasValue, FromCasValue)
+-- | Milliseconds since the epoch.
 newtype Timestamp = Timestamp Int64 deriving (Eq, Ord, Show, Read, ToCasValue, FromCasValue)
 newtype TimeUUID = TimeUUID UUID deriving (Eq, Ord, Read, Show, ToCasValue, FromCasValue)
 
