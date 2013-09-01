@@ -37,6 +37,7 @@ module Database.Cassandra.CQL.Protocol
     , encodeValue
     , decodeValue
     , decodeRows
+    , DecodeFailure(..)
     , FromCasValue(..)
     , ToCasValue(..)
     , FromCasValues(..)
