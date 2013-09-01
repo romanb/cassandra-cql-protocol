@@ -34,8 +34,8 @@ data Request = Request
     , reqStreamId :: !Int8
         -- ^ The stream IDs is used to correlate async. responses to requests.
         -- Negative IDs are reserved for the server (e.g. all 'Event' responses
-        -- have a stream ID of -1). Thus there are 127 stream IDs available for
-        -- clients to manage async. requests per connection.
+        -- have a stream ID of -1). Thus there are 128 (0 to 127) stream IDs
+        -- available for clients to manage async. requests per connection.
     , reqTracing :: !Bool
         -- ^ Whether to trace the request. If so, the response will contain a
         -- 'rspTraceId'. Note that not all requests support tracing.
